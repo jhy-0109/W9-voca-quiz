@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>영어 단어 객관식 퀴즈</title>
+    <!-- Supabase JavaScript v2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .progress {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            text-align: right;
+        }
+        .question-box {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+            background: #eef2f7;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .option-btn {
+            background-color: #fff;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        .option-btn:hover:not(:disabled) {
+            background-color: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        .option-btn:disabled {
+            cursor: default;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        .feedback.correct {
+            background-color: #d1fae5;
+            color: #065f46;
+            display: block;
+        }
+        .feedback.incorrect {
+            background-color: #fee2e2;
+            color: #991b1b;
+            display: block;
+        }
+        .next-btn, .restart-btn {
+            width: 100%;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            display: none;
+        }
+        .next-btn:hover, .restart-btn:hover {
+            background-color: #2563eb;
+        }
+        .result-container {
+            text-align: center;
+            display: none;
+        }
+        .result-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e293b;
+            margin: 20px 0;
+        }
+        .status-msg {
+            font-size: 12px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>영어 단어 퀴즈</h2>
+    
+    <!-- 퀴즈 화면 -->
+    <div id="quiz-screen">
+        <div class="progress" id="progress-text">문제 1 / 3</div>
+        <div class="question-box" id="question-text">문제가 로드 중입니다...</div>
+        <div class="options" id="options-container"></div>
+        <div class="feedback" id="feedback-box"></div>
+        <button class="next-btn" id="next-btn" onclick="nextQuestion()">다음 문제</button>
+    </div>
+
+    <!-- 결과 화면 -->
+    <div class="result-container" id="result-screen">
+        <h3>퀴즈 완료!</h3>
+        <div class="result-score" id="result-score-text">총점: 0 / 3점</div>
+        <button class="restart-btn" id="restart-btn" style="display: block;" onclick="startQuiz()">다시 풀기</button>
+    </div>
+
+    <div class="status-msg" id="status-msg"></div>
+</div>
+
+<script>
+    // Supabase 설정 (빈칸)
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
+
+    let supabaseClient = null;
+    try {
+        if (SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_PUBLISHABLE_KEY !== "YOUR_PUBLISHABLE_KEY") {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        }
+    } catch (e) {
+        console.error("Supabase 초기화 오류:", e);
+    }
+
+    // 퀴즈 데이터
+    const quizData = [
+        { question_no: 1, english_word: "abundant", options: ["조용한", "풍부한", "위험한", "느린"], answer: "풍부한" },
+        { question_no: 2, english_word: "reluctant", options: ["주저하는", "열정적인", "정확한", "부지런한"], answer: "주저하는" },
+        { question_no: 3, english_word: "brief", options: ["강력한", "평범한", "짧은", "불규칙한"], answer: "짧은" }
+    ];
+
+    let currentIndex = 0;
+    let score = 0;
+    let attemptId = "";
+    let questionStartTime = 0;
+    let hasAnsweredCurrent = false;
+
+    function startQuiz() {
+        attemptId = crypto.randomUUID();
+        currentIndex = 0;
+        score = 0;
+        hasAnsweredCurrent = false;
+
+        document.getElementById("quiz-screen").style.display = "block";
+        document.getElementById("result-screen").style.display = "none";
+        document.getElementById("restart-btn").style.display = "none";
+        document.getElementById("status-msg").textContent = "";
+
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        hasAnsweredCurrent = false;
+        const currentQ = quizData[currentIndex];
+
+        document.getElementById("progress-text").textContent = `문제 ${currentIndex + 1} / 3`;
+        document.getElementById("question-text").textContent = `"${currentQ.english_word}"의 뜻으로 알맞은 것은?`;
+        
+        const optionsContainer = document.getElementById("options-container");
+        optionsContainer.innerHTML = "";
+
+        currentQ.options.forEach(opt => {
+            const btn = document.createElement("button");
+            btn.className = "option-btn";
+            btn.textContent = opt;
+            btn.onclick = () => selectAnswer(opt, btn);
+            optionsContainer.appendChild(btn);
+        });
+
+        document.getElementById("feedback-box").style.display = "none";
+        document.getElementById("feedback-box").className = "feedback";
+        document.getElementById("next-btn").style.display = "none";
+
+        // 문제 제시 시점 기록
+        questionStartTime = performance.now();
+    }
+
+    async function selectAnswer(selectedOption, clickedBtn) {
+        if (hasAnsweredCurrent) return;
+        hasAnsweredCurrent = true;
+
+        // 응답 시간 계산 (ms) 및 검증 (0 이상)
+        let responseTimeMs = Math.round(performance.now() - questionStartTime);
+        if (responseTimeMs < 0) responseTimeMs = 0;
+
+        const currentQ = quizData[currentIndex];
+        const isCorrect = (selectedOption === currentQ.answer);
+
+        if (isCorrect) {
+            score++;
+            clickedBtn.style.backgroundColor = "#d1fae5";
+            clickedBtn.style.borderColor = "#10b981";
+        } else {
+            clickedBtn.style.backgroundColor = "#fee2e2";
+            clickedBtn.style.borderColor = "#ef4444";
+            
+            // 정답 버튼 강조
+            const buttons = document.querySelectorAll(".option-btn");
+            buttons.forEach(b => {
+                if (b.textContent === currentQ.answer) {
+                    b.style.backgroundColor = "#d1fae5";
+                    b.style.borderColor = "#10b981";
+                }
+            });
+        }
+
+        // 모든 보기 비활성화
+        document.querySelectorAll(".option-btn").forEach(b => b.disabled = true);
+
+        // 정오답 피드백 표시
+        const feedbackBox = document.getElementById("feedback-box");
+        feedbackBox.textContent = isCorrect ? "정답입니다!" : `틀렸습니다! 정답: ${currentQ.answer}`;
+        feedbackBox.className = `feedback ${isCorrect ? "correct" : "incorrect"}`;
+        feedbackBox.style.display = "block";
+
+        // 다음 버튼 또는 결과 보기 버튼 표시
+        const nextBtn = document.getElementById("next-btn");
+        if (currentIndex < quizData.length - 1) {
+            nextBtn.textContent = "다음 문제";
+        } else {
+            nextBtn.textContent = "결과 보기";
+        }
+        nextBtn.style.display = "block";
+
+        // Supabase INSERT (INSERT만 수행, SELECT/UPDATE/DELETE 미사용)
+        if (supabaseClient) {
+            try {
+                const { error } = await supabaseClient
+                    .from("quiz_answers")
+                    .insert({
+                        attempt_id: attemptId,
+                        question_no: currentQ.question_no,
+                        english_word: currentQ.english_word,
+                        chosen_answer: selectedOption,
+                        is_correct: isCorrect,
+                        response_time_ms: responseTimeMs
+                    });
+
+                if (error) {
+                    console.error("저장 실패:", error.message);
+                    document.getElementById("status-msg").textContent = "⚠️ 응답 저장 중 오류가 발생했으나 퀴즈는 정상 진행됩니다.";
+                } else {
+                    document.getElementById("status-msg").textContent = "";
+                }
+            } catch (err) {
+                console.error("네트워크 오류:", err);
+                document.getElementById("status-msg").textContent = "⚠️ 네트워크 오류로 저장에 실패했습니다.";
+            }
+        } else {
+            document.getElementById("status-msg").textContent = "⚠️ Supabase가 설정되지 않아 데이터가 저장되지 않습니다.";
+        }
+    }
+
+    function nextQuestion() {
+        currentIndex++;
+        if (currentIndex < quizData.length) {
+            loadQuestion();
+        } else {
+            document.getElementById("quiz-screen").style.display = "none";
+            document.getElementById("result-screen").style.display = "block";
+            document.getElementById("result-score-text").textContent = `총점: ${score} / 3점`;
+            document.getElementById("restart-btn").style.display = "block";
+        }
+    }
+
+    // 초기 실행
+    startQuiz();
+</script>
+
+</body>
+</html>

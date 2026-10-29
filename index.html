@@ -146,12 +146,12 @@
 
 <script>
     // Supabase 설정 (빈칸)
-    const SUPABASE_URL = "YOUR_SUPABASE_URL";
-    const SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY";
+    const SUPABASE_URL = "https://allwrzwxeikxjrnjghtp.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_g9SiJPUONg9ikSM0k7Mb-w_cwccN9Uy";
 
     let supabaseClient = null;
     try {
-        if (SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_PUBLISHABLE_KEY !== "YOUR_PUBLISHABLE_KEY") {
+        if (SUPABASE_URL !== "https://allwrzwxeikxjrnjghtp.supabase.co" && SUPABASE_PUBLISHABLE_KEY !== "sb_publishable_g9SiJPUONg9ikSM0k7Mb-w_cwccN9Uy") {
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
         }
     } catch (e) {
